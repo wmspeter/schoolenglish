@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Memory & Image Reveal Game</title>
+  <style>
+    /* --- CSS SECTION --- */
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      min-height: 100vh;
+      background: linear-gradient(to bottom right, #ffffff, #1a98a6, #ffffff);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* Top Bar: Timer and Refresh Button */
+    #top-bar {
+      width: 100%;
+      max-width: 900px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px;
+      box-sizing: border-box;
+      z-index: 100;
+    }
+
+    #timer-container {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    #timer-display {
+      font-size: 24px;
+      font-weight: bold;
+      color: #2c3e50;
+      background: rgba(255, 255, 255, 0.8);
+      padding: 10px 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    /* New Timer Mode Button */
+    #timer-mode-btn {
+      background-color: #e67e22; /* Orange to stand out */
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      font-size: 16px;
+      font-weight: bold;
+      border-radius: 8px;
+      cursor: pointer;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+      transition: background-color 0.3s;
+    }
+
+    #timer-mode-btn:hover {
+      background-color: #d35400;
+    }
+
+    #timer-mode-btn.active {
+      background-color: #27ae60; /* Turns green when active */
+      cursor: default;
+    }
+
+    #refresh-btn {
+      background-color: #2c3e50;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      font-size: 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+    }
+
+    #refresh-btn:hover {
+      background-color: #1a252f;
+    }
+
+    /* Layout Wrapper (Leaderboard Left, Board Right) */
+    #game-container {
+      display: flex;
+      gap: 40px;
+      align-items: flex-start;
+      justify-content: center;
+      margin-top: 10px;
+      width: 100%;
+      max-width: 1100px;
+    }
+
+    /* Leaderboard Panel */
+    #leaderboard-panel {
+      background: rgba(255, 255, 255, 0.9);
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+      width: 220px;
+      color: #2c3e50;
+      flex-shrink: 0;
+    }
+
+    #leaderboard-panel h2 {
+      margin-top: 0;
+      font-size: 18px;
+      text-align: center;
+      border-bottom: 2px solid #1a98a6;
+      padding-bottom: 10px;
+    }
+
+    #score-list {
+      list-style: decimal inside;
+      padding: 0;
+      margin: 0;
+    }
+
+    #score-list li {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid #ddd;
+      font-weight: bold;
+      font-size: 14px;
+    }
+    
+    #score-list li:last-child {
+      border-bottom: none;
+    }
+
+    /* Win Modal (Name Input) */
+    #win-modal {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.6);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 200;
+    }
+
+    .modal-content {
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      text-align: center;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    }
+
+    .modal-content input {
+      padding: 10px;
+      font-size: 16px;
+      margin-top: 10px;
+      border: 2px solid #bdc3c7;
+      border-radius: 6px;
+    }
+
+    .modal-content button {
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-top: 15px;
+    }
+
+    /* Loading Screen */
+    #loading-screen {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: #34495e;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+
+    /* Game Board Grid */
+    #game-board {
+      display: grid;
+      gap: 15px;
+    }
+
+    /* 3D Card Mechanics */
+    .card-slot { width: 120px; height: 120px; perspective: 1000px; }
+    .card-inner {
+      width: 100%; height: 100%; position: relative;
+      transition: transform 0.6s; transform-style: preserve-3d; cursor: pointer;
+    }
+    .card-inner.flipped { transform: rotateY(180deg); }
+    .card-front {
+      width: 100%; height: 100%; position: absolute; backface-visibility: hidden;
+      border-radius: 12px; background-color: #bdc3c7; 
+      display: flex; justify-content: center; align-items: center;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+      background-image: url('https://upload.wikimedia.org/wikipedia/commons/thumb/1/11/Blue_question_mark_icon.svg/120px-Blue_question_mark_icon.svg.png');
+      background-size: 40%; background-repeat: no-repeat; background-position: center;
+    }
+    .card-back {
+      width: 100%; height: 100%; position: absolute; backface-visibility: hidden;
+      border-radius: 12px; transform: rotateY(180deg); box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    .image-layer {
+      width: 100%; height: 100%; position: absolute; top: 0; left: 0;
+      border-radius: 12px; background-repeat: no-repeat; z-index: 1;
+    }
+    .content-layer {
+      width: 100%; height: 100%; position: absolute; top: 0; left: 0;
+      background-color: #bdc3c7; border-radius: 12px;
+      display: flex; justify-content: center; align-items: center; text-align: center;
+      color: #2c3e50; font-weight: bold; font-size: 14px;
+      transition: opacity 0.5s ease, background-color 0.3s ease; z-index: 2;
+    }
+    .content-layer img { max-width: 100%; max-height: 100%; object-fit: contain; }
+    .content-layer.matched { background-color: #4CAF50; color: white; }
+    
+    #final-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background-color: rgba(255, 255, 255, 0.85); background-repeat: no-repeat;
+      background-position: center; background-size: contain;
+      z-index: 50; opacity: 0; transition: opacity 1s ease-in-out; pointer-events: none; 
+    }
+    #final-overlay.visible { opacity: 1; }
+  </style>
+</head>
+<body>
+
+  <!-- Loading Screen -->
+  <div id="loading-screen">
+    <h1>Loading Game Assets...</h1>
+    <p id="loading-text">0 loaded</p>
+  </div>
+
+  <!-- Fullscreen Final Overlay -->
+  <div id="final-overlay" class="hidden"></div>
+
+  <!-- Win Modal (Only appears in Timer Mode) -->
+  <div id="win-modal" class="hidden">
+    <div class="modal-content">
+      <h2>Game Complete!</h2>
+      <p>Your Time: <span id="final-time">0</span> seconds</p>
+      <input type="text" id="player-name" placeholder="Enter your name" maxlength="15">
+      <br>
+      <button id="submit-score-btn">Submit to Leaderboard</button>
+    </div>
+  </div>
+
+  <!-- Top Bar (Timer, Timer Mode Button, & Reset) -->
+  <div id="top-bar" class="hidden">
+    <div id="timer-container">
+      <div id="timer-display">Time: <span id="time-val">0</span>s</div>
+      <button id="timer-mode-btn">Start Timer Mode</button>
+    </div>
+    <button id="refresh-btn">Reset Game</button>
+  </div>
+
+  <!-- Main Game Area -->
+  <div id="game-container" class="hidden">
+    
+    <!-- Leaderboard Panel (Now on the Left) -->
+    <div id="leaderboard-panel">
+      <h2>Top 10 Players</h2>
+      <ul id="score-list">
+        <!-- Scores injected here via JS -->
+      </ul>
+    </div>
+
+    <!-- The Board -->
+    <div id="game-board"></div>
+    
+  </div>
+
+<script type="module">
+    /* --- FIREBASE REALTIME DATABASE INITIALIZATION --- */
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    // Imported Realtime Database instead of Firestore
+    import { getDatabase, ref, push, get, query, orderByChild, limitToFirst } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDAZnluDsl4jesSSHbkIL8s2eytIt7Scrk",
+      authDomain: "flipgame-flipgame.firebaseapp.com",
+      projectId: "flipgame-flipgame",
+      storageBucket: "flipgame-flipgame.firebasestorage.app",
+      messagingSenderId: "986186522881",
+      appId: "1:986186522881:web:2c0ddb4f50ffc81b8e7b00",
+      // Added your specific Southeast Asia database URL
+      databaseURL: "https://flipgame-flipgame-default-rtdb.asia-southeast1.firebasedatabase.app/"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    /* --- GAME SETTINGS --- */
+    const TARGET_IMAGE = 'https://images.template.net/551106/Gradient-Background-edit-online.webp';
+    const GREEN_FADE_DELAY = 1000; 
+    
+    const gameData = [
+      { id: 1, imgUrl: 'https://res.cloudinary.com/dnabfe0ki/image/upload/v1779285084/ThangLongCitadel_zfnzji.jpg', text: 'Thang Long Citadel' },
+      { id: 2, imgUrl: 'https://res.cloudinary.com/dnabfe0ki/image/upload/v1779285083/HueImperialCitadel_efgxij.jpg', text: 'Hue Imperial Citadel' },
+      { id: 3, imgUrl: 'https://res.cloudinary.com/dnabfe0ki/image/upload/v1779285084/HoiAnsAncientStreet_l7gdwb.jpg', text: "Hoi An's Ancient Streets" },
+      { id: 4, imgUrl: 'https://res.cloudinary.com/dnabfe0ki/image/upload/v1779285083/TayNguyenGong_bvxb0o.jpg', text: 'Tay Nguyen Gong' },
+      { id: 5, imgUrl: 'https://res.cloudinary.com/dnabfe0ki/image/upload/v1779285083/XoanSInging_d5m6ua.jpg', text: 'Xoan Singing' },
+      { id: 6, imgUrl: 'https://res.cloudinary.com/dnabfe0ki/image/upload/v1779285082/HoDynastyStoneWall_acatd5.jpg', text: 'Ho Dynasty Stone Wall' },
+      { id: 7, imgUrl: 'https://res.cloudinary.com/dnabfe0ki/image/upload/v1779285082/LangVongCom_vnzxz8.jpg', text: "Lang Vong's Com" },
+      { id: 7, imgUrl: 'https://res.cloudinary.com/dnabfe0ki/image/upload/v1779285577/BacNinhFolkSongs_wnjogq.jpg', text: "Bac Ninh Folk Songs" }
+    ];
+
+    const CARD_SIZE = 120;
+    const GAP_SIZE = 15;
+
+    let lockBoard = false;
+    let hasFlippedCard = false;
+    let firstCard, secondCard;
+    let totalMatchesFound = 0;
+
+    let timerInterval = null;
+    let secondsElapsed = 0;
+    let timerStarted = false;
+    let isTimerModeActive = false; 
+
+    /* --- UPDATED REALTIME DATABASE LEADERBOARD LOGIC --- */
+    
+    async function updateLeaderboardUI() {
+      const list = document.getElementById('score-list');
+      list.innerHTML = '<li>Loading...</li>';
+
+      try {
+        const leaderboardRef = ref(db, 'leaderboard');
+        // Query: order by the 'time' child key, limit to top 10 fastest
+        const topScoresQuery = query(leaderboardRef, orderByChild('time'), limitToFirst(10));
+        const snapshot = await get(topScoresQuery);
+        
+        list.innerHTML = ''; 
+
+        if (snapshot.exists()) {
+          let sortedEntries = [];
+          
+          snapshot.forEach((childSnapshot) => {
+            sortedEntries.push(childSnapshot.val());
+          });
+
+          // Firebase sorts ascending by default, which is perfect for lowest lap times
+          sortedEntries.forEach(entry => {
+            const li = document.createElement('li');
+            li.innerHTML = `<span>${entry.name}</span> <span>${entry.time}s</span>`;
+            list.appendChild(li);
+          });
+        } else {
+          list.innerHTML = '<li style="list-style:none;">No times yet!</li>';
+        }
+      } catch (error) {
+        console.error("Database Error: ", error);
+        list.innerHTML = '<li style="list-style:none; color: red;">Database Error</li>';
+      }
+    }
+
+    async function saveScore(name, time) {
+      try {
+        const leaderboardRef = ref(db, 'leaderboard');
+        // Push a new unique node into the JSON tree
+        await push(leaderboardRef, {
+          name: name,
+          time: Number(time),
+          timestamp: Date.now()
+        });
+        updateLeaderboardUI(); 
+      } catch (e) {
+        console.error("Failed to submit data: ", e);
+        alert("Submission failed. Double check your database Rules tab!");
+      }
+    }
+
+    /* --- GAME ARCHITECTURE --- */
+
+    function preloadImages() {
+      const loadingText = document.getElementById('loading-text');
+      let imagesLoaded = 0;
+      const totalImagesToLoad = gameData.length + 1; 
+
+      const fallbackTimer = setTimeout(() => { startGame(); }, 3000);
+
+      function imgLoaded() {
+        imagesLoaded++;
+        loadingText.innerText = `${imagesLoaded} / ${totalImagesToLoad} loaded`;
+        if (imagesLoaded === totalImagesToLoad) {
+          clearTimeout(fallbackTimer);
+          setTimeout(startGame, 300);
+        }
+      }
+
+      const targetImg = new Image();
+      targetImg.onload = imgLoaded;
+      targetImg.onerror = imgLoaded;
+      targetImg.src = TARGET_IMAGE;
+
+      gameData.forEach(data => {
+        const img = new Image();
+        img.onload = imgLoaded;
+        img.onerror = imgLoaded;
+        img.src = data.imgUrl;
+      });
+      
+      updateLeaderboardUI(); 
+    }
+
+    function startGame(keepTimerMode = false) {
+      document.getElementById('loading-screen').classList.add('hidden');
+      document.getElementById('top-bar').classList.remove('hidden');
+      document.getElementById('game-container').classList.remove('hidden');
+      document.getElementById('win-modal').classList.add('hidden');
+      
+      const overlay = document.getElementById('final-overlay');
+      overlay.classList.remove('visible');
+      setTimeout(() => overlay.classList.add('hidden'), 1000);
+
+      const board = document.getElementById('game-board');
+      board.innerHTML = ''; 
+      
+      // Reset logic and timer
+      resetMatchVariables();
+      totalMatchesFound = 0;
+      stopTimer();
+      secondsElapsed = 0;
+      timerStarted = false;
+      document.getElementById('time-val').innerText = '0';
+
+      const modeBtn = document.getElementById('timer-mode-btn');
+      if (!keepTimerMode) {
+        isTimerModeActive = false;
+        modeBtn.innerText = "Start Timer Mode";
+        modeBtn.classList.remove('active');
+      }
+
+      // 1. RANDOM SELECTION: Shuffle your 10 items and grab exactly 8 of them
+      let selectedData = [...gameData].sort(() => 0.5 - Math.random()).slice(0, 8);
+
+      // 2. Build the Deck using only the 8 selected pairs (16 cards total)
+      let cardsArray = [];
+      selectedData.forEach(item => {
+        cardsArray.push({ type: 'image', content: item.imgUrl, matchId: item.id });
+        cardsArray.push({ type: 'text', content: item.text, matchId: item.id });
+      });
+      cardsArray.sort(() => 0.5 - Math.random());
+
+      // 3. PERFECT 4x4 GRID MATH
+      const cols = 4;
+      const rows = 4;
+      
+      const totalGridWidth = (cols * CARD_SIZE) + ((cols - 1) * GAP_SIZE);
+      const totalGridHeight = (rows * CARD_SIZE) + ((rows - 1) * GAP_SIZE);
+
+      board.style.gridTemplateColumns = `repeat(${cols}, ${CARD_SIZE}px)`;
+      board.style.width = `${totalGridWidth}px`;
+      overlay.style.backgroundImage = `url('${TARGET_IMAGE}')`;
+
+      // 4. Build DOM Elements
+      for (let i = 0; i < cardsArray.length; i++) {
+        const cardData = cardsArray[i];
+        const colIndex = i % cols;
+        const rowIndex = Math.floor(i / cols);
+        const xOffset = colIndex * (CARD_SIZE + GAP_SIZE);
+        const yOffset = rowIndex * (CARD_SIZE + GAP_SIZE);
+
+        const slot = document.createElement('div');
+        slot.classList.add('card-slot');
+        const inner = document.createElement('div');
+        inner.classList.add('card-inner');
+        inner.dataset.matchId = cardData.matchId;
+        const front = document.createElement('div');
+        front.classList.add('card-front');
+        const back = document.createElement('div');
+        back.classList.add('card-back');
+        const imageLayer = document.createElement('div');
+        imageLayer.classList.add('image-layer');
+        imageLayer.style.backgroundImage = `url('${TARGET_IMAGE}')`;
+        imageLayer.style.backgroundSize = `${totalGridWidth}px ${totalGridHeight}px`;
+        imageLayer.style.backgroundPosition = `-${xOffset}px -${yOffset}px`;
+        const contentLayer = document.createElement('div');
+        contentLayer.classList.add('content-layer');
+        
+        if (cardData.type === 'image') {
+          contentLayer.innerHTML = `<img src="${cardData.content}" alt="game asset">`;
+        } else {
+          contentLayer.innerHTML = cardData.content;
+        }
+
+        back.appendChild(imageLayer);
+        back.appendChild(contentLayer);
+        inner.appendChild(front);
+        inner.appendChild(back);
+        slot.appendChild(inner);
+        board.appendChild(slot);
+        inner.addEventListener('click', flipCard);
+      }
+    }
+
+    function startTimer() {
+      if (timerStarted) return;
+      timerStarted = true;
+      timerInterval = setInterval(() => {
+        secondsElapsed++;
+        document.getElementById('time-val').innerText = secondsElapsed;
+      }, 1000);
+    }
+
+    function stopTimer() {
+      clearInterval(timerInterval);
+    }
+
+    document.getElementById('timer-mode-btn').addEventListener('click', function() {
+      if (isTimerModeActive) return;
+      isTimerModeActive = true;
+      this.innerText = "Timer Mode: ON";
+      this.classList.add('active');
+      startGame(true); 
+    });
+
+    function flipCard() {
+      if (isTimerModeActive) {
+        startTimer(); 
+      }
+      if (lockBoard) return; 
+      if (this === firstCard) return; 
+
+      this.classList.add('flipped');
+      if (!hasFlippedCard) {
+        hasFlippedCard = true;
+        firstCard = this;
+        return;
+      }
+      secondCard = this;
+      checkForMatch();
+    }
+
+    function checkForMatch() {
+      let isMatch = firstCard.dataset.matchId === secondCard.dataset.matchId;
+      if (isMatch) {
+        processMatch();
+      } else {
+        unflipCards(); 
+      }
+    }
+
+    function processMatch() {
+      firstCard.removeEventListener('click', flipCard);
+      secondCard.removeEventListener('click', flipCard);
+      
+      const content1 = firstCard.querySelector('.content-layer');
+      const content2 = secondCard.querySelector('.content-layer');
+      content1.classList.add('matched');
+      content2.classList.add('matched');
+
+      totalMatchesFound += 2; 
+
+      setTimeout(() => {
+        content1.style.opacity = '0';
+        content2.style.opacity = '0';
+        checkWinCondition();
+      }, GREEN_FADE_DELAY);
+
+      resetMatchVariables();
+    }
+
+    function unflipCards() {
+      lockBoard = true; 
+      setTimeout(() => {
+        firstCard.classList.remove('flipped');
+        secondCard.classList.remove('flipped');
+        resetMatchVariables();
+      }, 1000);
+    }
+
+    function resetMatchVariables() {
+      hasFlippedCard = false;
+      lockBoard = false;
+      firstCard = null;
+      secondCard = null;
+    }
+
+    function checkWinCondition() {
+      // Game finishes when all 16 cards on the 4x4 grid are matched
+      if (totalMatchesFound === 16) {
+        stopTimer();
+        
+        setTimeout(() => {
+          const overlay = document.getElementById('final-overlay');
+          overlay.classList.remove('hidden');
+          setTimeout(() => overlay.classList.add('visible'), 50); 
+          
+          if (isTimerModeActive) {
+            setTimeout(() => {
+              document.getElementById('final-time').innerText = secondsElapsed;
+              document.getElementById('win-modal').classList.remove('hidden');
+            }, 1200); 
+          }
+        }, 500);
+      }
+    }
+
+    document.getElementById('submit-score-btn').addEventListener('click', () => {
+      const nameInput = document.getElementById('player-name').value.trim();
+      if (nameInput === "") {
+        alert("Please enter a name!");
+        return;
+      }
+      saveScore(nameInput, secondsElapsed);
+      
+      document.getElementById('win-modal').classList.add('hidden'); 
+      const modeBtn = document.getElementById('timer-mode-btn');
+      modeBtn.innerText = "Start Timer Mode";
+      modeBtn.classList.remove('active');
+      isTimerModeActive = false;
+    });
+
+    document.getElementById('refresh-btn').addEventListener('click', () => startGame(false));
+    
+    preloadImages();
+  </script>
